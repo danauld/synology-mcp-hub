@@ -49,15 +49,20 @@ docker run --rm -p 8120-8122:8120-8122 synology-mcp-hub:dev
 Synology hosts run amd64. From the M-series Mac:
 
 ```bash
-docker buildx build \
+# 1. Authenticate Docker to GHCR (uses gh CLI's stored token)
+gh auth token | docker login ghcr.io -u danauld --password-stdin
+
+# 2. Build + push (cross-platform, with GH token mounted for private clones)
+GH_TOKEN=$(gh auth token) docker buildx build \
   --platform linux/amd64 \
+  --secret id=gh_token,env=GH_TOKEN \
   --push \
   --tag ghcr.io/danauld/synology-mcp-hub:latest \
   --tag ghcr.io/danauld/synology-mcp-hub:$(date +%Y-%m-%d) \
   .
 ```
 
-Authenticate to GHCR first if needed: `echo $GITHUB_TOKEN | docker login ghcr.io -u danauld --password-stdin`.
+The `--secret id=gh_token` flag mounts the GH token at `/run/secrets/gh_token` inside the build, used to clone the two private MCP repos (`mcp-dispatcharr`, `mcp-grampsweb`). The token is never written to any image layer.
 
 ### Deploy on Synology
 
@@ -106,9 +111,11 @@ If the local Mac is lost, recovery is:
 git clone https://github.com/danauld/synology-mcp-hub.git
 git clone https://github.com/danauld/synology-mcp-hub-workers.git
 
-# 2. Cross-build + push image (need GHCR auth)
+# 2. Cross-build + push image (need GHCR auth + GH token for private clones)
 cd synology-mcp-hub
-docker buildx build --platform linux/amd64 --push \
+gh auth token | docker login ghcr.io -u danauld --password-stdin
+GH_TOKEN=$(gh auth token) docker buildx build --platform linux/amd64 --push \
+  --secret id=gh_token,env=GH_TOKEN \
   --tag ghcr.io/danauld/synology-mcp-hub:latest .
 
 # 3. Worker side: cd ../synology-mcp-hub-workers; see its README

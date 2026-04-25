@@ -28,20 +28,32 @@ RUN apt-get update \
 
 WORKDIR /build
 
-# --- arr MCP: pip-install from GitHub at a pinned commit (use `main` for now) ---
+# --- arr MCP: PUBLIC repo, no auth needed ---
 RUN python -m pip install --upgrade pip \
     && python -m pip install --no-cache-dir "git+https://github.com/danauld/mcp-arr@main"
 
-# --- dispatcharr MCP: clone + pip install requirements ---
-RUN git clone --depth=1 https://github.com/danauld/mcp-dispatcharr /mcps/dispatcharr \
-    && python -m pip install --no-cache-dir -r /mcps/dispatcharr/requirements.txt
+# --- dispatcharr + gramps: PRIVATE repos. Use BuildKit secret to inject a
+# GitHub token at build time. Token is never written to the image.
+# Build with: --secret id=gh_token,env=GH_TOKEN
 
-# --- gramps MCP: clone, npm install + build, keep only runtime deps + dist ---
-RUN git clone --depth=1 https://github.com/danauld/mcp-grampsweb /mcps/gramps \
+RUN --mount=type=secret,id=gh_token \
+    GH_TOKEN=$(cat /run/secrets/gh_token) \
+    && git clone --depth=1 \
+        "https://x-access-token:${GH_TOKEN}@github.com/danauld/mcp-dispatcharr.git" \
+        /mcps/dispatcharr \
+    && python -m pip install --no-cache-dir -r /mcps/dispatcharr/requirements.txt \
+    && rm -rf /mcps/dispatcharr/.git
+
+RUN --mount=type=secret,id=gh_token \
+    GH_TOKEN=$(cat /run/secrets/gh_token) \
+    && git clone --depth=1 \
+        "https://x-access-token:${GH_TOKEN}@github.com/danauld/mcp-grampsweb.git" \
+        /mcps/gramps \
     && cd /mcps/gramps \
     && npm ci \
     && npm run build \
-    && npm prune --omit=dev
+    && npm prune --omit=dev \
+    && rm -rf /mcps/gramps/.git
 
 # --- final stage: runtime image (no build toolchain bloat) ---
 FROM python:3.12-slim
