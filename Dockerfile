@@ -4,15 +4,17 @@
 #   /mcps/arr/         — pip-installed `mcp-arr` package (stdio, wrapped by supergateway)
 #   /mcps/dispatcharr/ — Python source (HTTP-native FastMCP)
 #   /mcps/gramps/      — Node app (HTTP-native MCP, built dist/)
+#   /mcps/trakt/       — Python source (stdio, wrapped by supergateway)
 #
 # Each MCP runs under supervisord on its own internal port:
 #   8120 — arr        (via supergateway → arr-mcp stdio)
 #   8121 — dispatcharr (python server.py listens directly)
 #   8122 — gramps     (node dist/index.js listens directly)
+#   8123 — trakt      (via supergateway → python /mcps/trakt/server.py stdio)
 #
 # Cloudflare Tunnel routes <slug>-be.danielauld.com → mcp-hub:81NN.
 # Per-MCP CF Worker shim handles OAuth + proxies to the backend hostnames.
-# This Dockerfile bakes all 3 MCP sources at build time — no runtime pip/git.
+# This Dockerfile bakes all 4 MCP sources at build time — no runtime pip/git.
 
 # syntax=docker/dockerfile:1.7
 
@@ -55,13 +57,22 @@ RUN --mount=type=secret,id=gh_token \
     && npm prune --omit=dev \
     && rm -rf /mcps/gramps/.git
 
+# --- trakt MCP: PRIVATE repo (recovered from Cloud Run image, pushed 2026-04-25) ---
+RUN --mount=type=secret,id=gh_token \
+    GH_TOKEN=$(cat /run/secrets/gh_token) \
+    && git clone --depth=1 \
+        "https://x-access-token:${GH_TOKEN}@github.com/danauld/mcp-trakt.git" \
+        /mcps/trakt \
+    && python -m pip install --no-cache-dir -r /mcps/trakt/requirements.txt \
+    && rm -rf /mcps/trakt/.git
+
 # --- final stage: runtime image (no build toolchain bloat) ---
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     SUPERVISOR_LOGLEVEL=info \
-    HUB_VERSION=v1
+    HUB_VERSION=v2
 
 # Runtime deps only: Node (for gramps + supergateway), supervisor, tini for clean shutdown.
 RUN apt-get update \
@@ -88,7 +99,7 @@ RUN chmod +x /usr/local/bin/healthcheck.sh
 # Expose the three internal ports. The Cloudflare Tunnel container reaches
 # these via Docker network DNS — no host port-mapping required at runtime,
 # but EXPOSE makes the contract explicit.
-EXPOSE 8120 8121 8122
+EXPOSE 8120 8121 8122 8123
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh

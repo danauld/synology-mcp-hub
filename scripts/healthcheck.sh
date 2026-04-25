@@ -27,4 +27,7 @@ curl -fsS --max-time 5 -X POST "http://127.0.0.1:8122/mcp" \
     -d '{"jsonrpc":"2.0","id":"hc","method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"healthcheck","version":"1.0"}}}' \
     >/dev/null
 
+# trakt-mcp via supergateway has a dedicated /healthz endpoint.
+curl -fsS --max-time 5 "http://127.0.0.1:8123/healthz" >/dev/null
+
 echo "OK"

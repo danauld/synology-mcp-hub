@@ -19,19 +19,21 @@ Claude.ai web / Claude Code / Codex
    - port 8120 → arr        (supergateway → arr-mcp stdio)
    - port 8121 → dispatcharr (python server.py, FastMCP HTTP)
    - port 8122 → gramps     (node dist/index.js, native HTTP)
-   ▼   Docker bridge networks (no tunnel hop)
-[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb
+   - port 8123 → trakt      (supergateway → python /mcps/trakt/server.py stdio)
+   ▼   Docker bridge networks (no tunnel hop) / Trakt API (external)
+[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv
 ```
 
-## v1 MCP roster
+## MCP roster
 
-| MCP | Language | Transport | Source | Internal port |
-|---|---|---|---|---|
-| **arr** (Sonarr/Radarr/Prowlarr) | Python | stdio + supergateway | `github.com/danauld/mcp-arr` (pip) | 8120 |
-| **dispatcharr** | Python | FastMCP HTTP | `github.com/danauld/mcp-dispatcharr` (clone) | 8121 |
-| **gramps** | Node TS | native HTTP | `github.com/danauld/mcp-grampsweb` (clone + npm build) | 8122 |
+| MCP | Language | Transport | Source | Internal port | Hub since |
+|---|---|---|---|---|---|
+| **arr** (Sonarr/Radarr/Prowlarr) | Python | stdio + supergateway | `github.com/danauld/mcp-arr` (pip) | 8120 | v1 |
+| **dispatcharr** | Python | FastMCP HTTP | `github.com/danauld/mcp-dispatcharr` (clone) | 8121 | v1 |
+| **gramps** | Node TS | native HTTP | `github.com/danauld/mcp-grampsweb` (clone + npm build) | 8122 | v1 |
+| **trakt** | Python | stdio + supergateway | `github.com/danauld/mcp-trakt` (clone) | 8123 | v2 (2026-04-25) |
 
-v2 (planned): Trakt MCP — see the worker repo for the addition pattern.
+Trakt has its own per-user device-code OAuth (independent of the Worker's OAuth). Its token persists at `/state/trakt/auth_token.json` inside the container, which is bind-mounted from `/volume1/docker/synology-mcp-hub/state/trakt` on the Synology host so it survives restarts + image upgrades.
 
 ## Build + deploy
 
@@ -62,7 +64,7 @@ GH_TOKEN=$(gh auth token) docker buildx build \
   .
 ```
 
-The `--secret id=gh_token` flag mounts the GH token at `/run/secrets/gh_token` inside the build, used to clone the two private MCP repos (`mcp-dispatcharr`, `mcp-grampsweb`). The token is never written to any image layer.
+The `--secret id=gh_token` flag mounts the GH token at `/run/secrets/gh_token` inside the build, used to clone the three private MCP repos (`mcp-dispatcharr`, `mcp-grampsweb`, `mcp-trakt`). The token is never written to any image layer.
 
 ### Deploy on Synology
 
@@ -74,6 +76,10 @@ mkdir -p /volume1/docker/synology-mcp-hub/env
 # arr.env       — SONARR_API_KEY, RADARR_API_KEY, PROWLARR_API_KEY
 # dispatcharr.env — DISPATCHARR_API_KEY
 # gramps.env    — GRAMPS_USERNAME, GRAMPS_PASSWORD
+# trakt.env     — TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET
+
+# Persistent state for Trakt's per-user OAuth token
+mkdir -p /volume1/docker/synology-mcp-hub/state/trakt
 ```
 
 Then deploy via Portainer:
