@@ -52,8 +52,9 @@ services:
 
     networks:
       mcp-hub-net:
-      # Join the backend Docker networks so the Hub can reach them by name.
-      sonarr_default: {}
+      # Join only the backend networks we actually use Docker DNS for.
+      # arr-mcp uses HOST IP (192.168.4.79:8989/7878/9696) for sonarr/radarr/
+      # prowlarr — no network join needed for those.
       dispatcharr_default: {}
       grampsweb_default: {}
 
@@ -78,10 +79,6 @@ networks:
   mcp-hub-net:
     name: mcp-hub-net
     driver: bridge
-
-  sonarr_default:
-    external: true
-    name: sonarr_default
 
   dispatcharr_default:
     external: true
