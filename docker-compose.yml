@@ -1,0 +1,83 @@
+# docker-compose.yml — Portainer stack file for the Synology MCP Hub.
+#
+# Deploy this stack on Balmoral via Portainer. Replaces the standalone
+# `arr-mcp` + `dispatcharr-mcp` Synology stacks and the Cloud Run
+# `grampsweb-mcp` service.
+#
+# Networks:
+#   - mcp-hub-net (internal): the Cloudflare Tunnel container joins this
+#     so it can reach mcp-hub by service name.
+#   - sonarr_default, dispatcharr_default, grampsweb_default (external):
+#     pre-existing networks created by the respective backend stacks.
+#     Joining them lets the Hub reach LAN backends by Docker DNS:
+#     http://sonarr:8989, http://dispatcharr:9191, http://grampsweb:5000
+#     etc., with zero tunnel hops.
+#
+# Auth model B (per the approved plan):
+#   - This Hub container has NO OAuth. It trusts incoming requests because
+#     the Cloudflare Tunnel routes them through a self-hosted CF Access
+#     app with a Service-Token-only policy. Only the per-MCP Worker shims
+#     hold the Service Token; only they can reach this container.
+#
+# Env files: each per-MCP env file is mounted from /volume1/docker/synology-mcp-hub/env/
+# on the Synology host (matches the existing dispatcharr-mcp pattern).
+
+services:
+  mcp-hub:
+    image: ghcr.io/danauld/synology-mcp-hub:latest
+    container_name: mcp-hub
+    restart: unless-stopped
+    pull_policy: always
+
+    env_file:
+      - /volume1/docker/synology-mcp-hub/env/arr.env
+      - /volume1/docker/synology-mcp-hub/env/dispatcharr.env
+      - /volume1/docker/synology-mcp-hub/env/gramps.env
+
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+    networks:
+      mcp-hub-net:
+      # Join the backend Docker networks so the Hub can reach them by name.
+      sonarr_default: {}
+      dispatcharr_default: {}
+      grampsweb_default: {}
+
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # The Cloudflare Tunnel container is shared (synology-dommus). We do NOT
+  # define it here — the existing tunnel stack on Balmoral handles it. We
+  # just need to update its ingress rules to route the three -be hostnames
+  # to mcp-hub:81NN. That's done via the CF API, not docker-compose.
+  #
+  # If/when the synology-dommus tunnel becomes part of this stack, add a
+  # cloudflared service here and merge the routing.
+
+networks:
+  mcp-hub-net:
+    name: mcp-hub-net
+    driver: bridge
+
+  sonarr_default:
+    external: true
+    name: sonarr_default
+
+  dispatcharr_default:
+    external: true
+    name: dispatcharr_default
+
+  grampsweb_default:
+    external: true
+    name: grampsweb_default
