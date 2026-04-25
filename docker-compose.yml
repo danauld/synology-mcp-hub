@@ -41,6 +41,15 @@ services:
       start_period: 30s
       retries: 3
 
+    # Publish each MCP's port to the Synology host so the existing
+    # synology-dommus cloudflared tunnel (which routes via 192.168.4.79:<port>)
+    # can reach them. The Synology firewall blocks external access — only
+    # the local tunnel container hits these ports.
+    ports:
+      - "8120:8120"  # arr
+      - "8121:8121"  # dispatcharr
+      - "8122:8122"  # gramps
+
     networks:
       mcp-hub-net:
       # Join the backend Docker networks so the Hub can reach them by name.
