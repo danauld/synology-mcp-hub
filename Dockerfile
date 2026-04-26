@@ -98,6 +98,14 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g supergateway@3.4.3 \
     && npm install -g @jagjeevan/openfoodfacts-mcp@1.1.0 \
+    # Patch upstream v1.1.0 bug: dist/tools/index.js calls registerPriceTools(server)
+    # twice in a row, which causes "Tool getProductPrices is already registered"
+    # at startup. Remove the second call. Track upstream for a fix; once resolved,
+    # bump the version pin and remove this awk.
+    && awk 'BEGIN{p=""} { if ($0 ~ /^[[:space:]]*registerPriceTools\(server\);$/ && p ~ /^[[:space:]]*registerPriceTools\(server\);$/) { p=$0; next } if (p != "") print p; p=$0 } END{ if (p != "") print p }' \
+        /usr/lib/node_modules/@jagjeevan/openfoodfacts-mcp/dist/tools/index.js > /tmp/off-index.js \
+    && mv /tmp/off-index.js /usr/lib/node_modules/@jagjeevan/openfoodfacts-mcp/dist/tools/index.js \
+    && [ "$(grep -c 'registerPriceTools(server);' /usr/lib/node_modules/@jagjeevan/openfoodfacts-mcp/dist/tools/index.js)" = "1" ] \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
