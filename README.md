@@ -16,12 +16,14 @@ Claude.ai web / Claude Code / Codex
 [CF self-hosted Access app — Service Token policy]
    ▼   tunnel: synology-dommus
 [mcp-hub container] supervisord runs:
-   - port 8120 → arr        (supergateway → arr-mcp stdio)
-   - port 8121 → dispatcharr (python server.py, FastMCP HTTP)
-   - port 8122 → gramps     (node dist/index.js, native HTTP)
-   - port 8123 → trakt      (supergateway → python /mcps/trakt/server.py stdio)
-   ▼   Docker bridge networks (no tunnel hop) / Trakt API (external)
-[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv
+   - port 8120 → arr           (supergateway → arr-mcp stdio)
+   - port 8121 → dispatcharr    (python server.py, FastMCP HTTP)
+   - port 8122 → gramps         (node dist/index.js, native HTTP)
+   - port 8123 → trakt          (supergateway → python /mcps/trakt/server.py stdio)
+   - port 8124 → openfoodfacts  (off-mcp-server, npm @jagjeevan/openfoodfacts-mcp@1.1.0)
+   - port 8125 → pbs            (node /mcps/pbs/dist/index.js, native HTTP)
+   ▼   Docker bridge networks (LAN backends) / Trakt + OpenFoodFacts + PBS APIs (external)
+[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv, api.openfoodfacts.org, services.health.gov.au/pbs
 ```
 
 ## MCP roster
@@ -32,6 +34,8 @@ Claude.ai web / Claude Code / Codex
 | **dispatcharr** | Python | FastMCP HTTP | `github.com/danauld/mcp-dispatcharr` (clone) | 8121 | v1 |
 | **gramps** | Node TS | native HTTP | `github.com/danauld/mcp-grampsweb` (clone + npm build) | 8122 | v1 |
 | **trakt** | Python | stdio + supergateway | `github.com/danauld/mcp-trakt` (clone) | 8123 | v2 (2026-04-25) |
+| **openfoodfacts** | Node TS | native HTTP | npm `@jagjeevan/openfoodfacts-mcp@1.1.0` (global install) | 8124 | v3 (2026-04-26) |
+| **pbs** | Node | native HTTP | `github.com/danauld/mcp-pbs` (clone, compiled JS) | 8125 | v3 (2026-04-26) |
 
 Trakt has its own per-user device-code OAuth (independent of the Worker's OAuth). Its token persists at `/state/trakt/auth_token.json` inside the container, which is bind-mounted from `/volume1/docker/synology-mcp-hub/state/trakt` on the Synology host so it survives restarts + image upgrades.
 

@@ -1,20 +1,24 @@
 # Synology MCP Hub — single image hosting multiple Python/Node MCPs
 #
 # Layout inside container:
-#   /mcps/arr/         — pip-installed `mcp-arr` package (stdio, wrapped by supergateway)
-#   /mcps/dispatcharr/ — Python source (HTTP-native FastMCP)
-#   /mcps/gramps/      — Node app (HTTP-native MCP, built dist/)
-#   /mcps/trakt/       — Python source (stdio, wrapped by supergateway)
+#   /mcps/arr/           — pip-installed `mcp-arr` package (stdio, wrapped by supergateway)
+#   /mcps/dispatcharr/   — Python source (HTTP-native FastMCP)
+#   /mcps/gramps/        — Node app (HTTP-native MCP, built dist/)
+#   /mcps/trakt/         — Python source (stdio, wrapped by supergateway)
+#   /mcps/pbs/           — Node app (HTTP-native MCP, recovered compiled JS in dist/)
+#   (openfoodfacts is a global npm install, not under /mcps)
 #
 # Each MCP runs under supervisord on its own internal port:
-#   8120 — arr        (via supergateway → arr-mcp stdio)
-#   8121 — dispatcharr (python server.py listens directly)
-#   8122 — gramps     (node dist/index.js listens directly)
-#   8123 — trakt      (via supergateway → python /mcps/trakt/server.py stdio)
+#   8120 — arr            (via supergateway → arr-mcp stdio)
+#   8121 — dispatcharr    (python server.py listens directly)
+#   8122 — gramps         (node dist/index.js listens directly)
+#   8123 — trakt          (via supergateway → python /mcps/trakt/server.py stdio)
+#   8124 — openfoodfacts  (off-mcp-server, npm-global @jagjeevan/openfoodfacts-mcp@1.1.0)
+#   8125 — pbs            (node /mcps/pbs/dist/index.js listens directly)
 #
 # Cloudflare Tunnel routes <slug>-be.danielauld.com → mcp-hub:81NN.
 # Per-MCP CF Worker shim handles OAuth + proxies to the backend hostnames.
-# This Dockerfile bakes all 4 MCP sources at build time — no runtime pip/git.
+# This Dockerfile bakes all 6 MCP sources at build time — no runtime pip/git.
 
 # syntax=docker/dockerfile:1.7
 
@@ -66,13 +70,25 @@ RUN --mount=type=secret,id=gh_token \
     && python -m pip install --no-cache-dir -r /mcps/trakt/requirements.txt \
     && rm -rf /mcps/trakt/.git
 
+# --- pbs MCP: PRIVATE repo (recovered from Cloud Run image, pushed 2026-04-26).
+# Compiled `dist/` only — no `src/` was recoverable. Runs `node dist/index.js`
+# with TRANSPORT=http (see supervisord.conf). ---
+RUN --mount=type=secret,id=gh_token \
+    GH_TOKEN=$(cat /run/secrets/gh_token) \
+    && git clone --depth=1 \
+        "https://x-access-token:${GH_TOKEN}@github.com/danauld/mcp-pbs.git" \
+        /mcps/pbs \
+    && cd /mcps/pbs \
+    && npm ci --omit=dev \
+    && rm -rf /mcps/pbs/.git
+
 # --- final stage: runtime image (no build toolchain bloat) ---
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     SUPERVISOR_LOGLEVEL=info \
-    HUB_VERSION=v2
+    HUB_VERSION=v3
 
 # Runtime deps only: Node (for gramps + supergateway), supervisor, tini for clean shutdown.
 RUN apt-get update \
@@ -81,6 +97,7 @@ RUN apt-get update \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g supergateway@3.4.3 \
+    && npm install -g @jagjeevan/openfoodfacts-mcp@1.1.0 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -99,7 +116,7 @@ RUN chmod +x /usr/local/bin/healthcheck.sh
 # Expose the three internal ports. The Cloudflare Tunnel container reaches
 # these via Docker network DNS — no host port-mapping required at runtime,
 # but EXPOSE makes the contract explicit.
-EXPOSE 8120 8121 8122 8123
+EXPOSE 8120 8121 8122 8123 8124 8125
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh

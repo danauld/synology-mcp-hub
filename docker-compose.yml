@@ -57,6 +57,8 @@ services:
       - "8121:8121"  # dispatcharr
       - "8122:8122"  # gramps
       - "8123:8123"  # trakt
+      - "8124:8124"  # openfoodfacts
+      - "8125:8125"  # pbs
 
     networks:
       mcp-hub-net:

@@ -30,4 +30,10 @@ curl -fsS --max-time 5 -X POST "http://127.0.0.1:8122/mcp" \
 # trakt-mcp via supergateway has a dedicated /healthz endpoint.
 curl -fsS --max-time 5 "http://127.0.0.1:8123/healthz" >/dev/null
 
+# openfoodfacts-mcp (npm @jagjeevan/openfoodfacts-mcp) exposes /health.
+curl -fsS --max-time 5 "http://127.0.0.1:8124/health" >/dev/null
+
+# pbs-mcp (recovered Express HTTP MCP) exposes /health.
+curl -fsS --max-time 5 "http://127.0.0.1:8125/health" >/dev/null
+
 echo "OK"
