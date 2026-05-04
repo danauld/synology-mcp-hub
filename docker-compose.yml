@@ -60,7 +60,7 @@ services:
       - "8123:8123"  # trakt
       - "8124:8124"  # openfoodfacts
       - "8125:8125"  # pbs
-      - "8126:8126"  # nanobanana
+      - "8127:8127"  # nanobanana
 
     networks:
       mcp-hub-net:

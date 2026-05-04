@@ -15,7 +15,7 @@
 #   8123 — trakt          (via supergateway → python /mcps/trakt/server.py stdio)
 #   8124 — openfoodfacts  (off-mcp-server, npm-global @jagjeevan/openfoodfacts-mcp@1.1.0)
 #   8125 — pbs            (node /mcps/pbs/dist/index.js listens directly)
-#   8126 — nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
+#   8127 — nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
 #
 # Cloudflare Tunnel routes <slug>-be.danielauld.com → mcp-hub:81NN.
 # Per-MCP CF Worker shim handles OAuth + proxies to the backend hostnames.
@@ -112,7 +112,7 @@ RUN apt-get update \
 
 # --- nanobanana MCP: PyPI-installed Python FastMCP server (zhongweili/nanobanana-mcp-server).
 # Installs the `nanobanana-mcp-server` console script. Reads FASTMCP_TRANSPORT=http
-# + FASTMCP_HOST + FASTMCP_PORT from supervisord env to serve over HTTP on :8126.
+# + FASTMCP_HOST + FASTMCP_PORT from supervisord env to serve over HTTP on :8127.
 # Auth: GEMINI_API_KEY (Google AI Studio), supplied via env_file: env/nanobanana.env. ---
 RUN python -m pip install --no-cache-dir "nanobanana-mcp-server>=0.4.4"
 
@@ -131,7 +131,7 @@ RUN chmod +x /usr/local/bin/healthcheck.sh
 # Expose the three internal ports. The Cloudflare Tunnel container reaches
 # these via Docker network DNS — no host port-mapping required at runtime,
 # but EXPOSE makes the contract explicit.
-EXPOSE 8120 8121 8122 8123 8124 8125 8126
+EXPOSE 8120 8121 8122 8123 8124 8125 8127
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh
