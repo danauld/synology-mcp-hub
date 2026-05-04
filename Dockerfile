@@ -6,7 +6,7 @@
 #   /mcps/gramps/        — Node app (HTTP-native MCP, built dist/)
 #   /mcps/trakt/         — Python source (stdio, wrapped by supergateway)
 #   /mcps/pbs/           — Node app (HTTP-native MCP, recovered compiled JS in dist/)
-#   (openfoodfacts is a global npm install, not under /mcps)
+#   (openfoodfacts + nanobanana are package installs, not under /mcps)
 #
 # Each MCP runs under supervisord on its own internal port:
 #   8120 — arr            (via supergateway → arr-mcp stdio)
@@ -15,6 +15,7 @@
 #   8123 — trakt          (via supergateway → python /mcps/trakt/server.py stdio)
 #   8124 — openfoodfacts  (off-mcp-server, npm-global @jagjeevan/openfoodfacts-mcp@1.1.0)
 #   8125 — pbs            (node /mcps/pbs/dist/index.js listens directly)
+#   8126 — nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
 #
 # Cloudflare Tunnel routes <slug>-be.danielauld.com → mcp-hub:81NN.
 # Per-MCP CF Worker shim handles OAuth + proxies to the backend hostnames.
@@ -88,7 +89,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     SUPERVISOR_LOGLEVEL=info \
-    HUB_VERSION=v3
+    HUB_VERSION=v4
 
 # Runtime deps only: Node (for gramps + supergateway), supervisor, tini for clean shutdown.
 RUN apt-get update \
@@ -109,6 +110,12 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# --- nanobanana MCP: PyPI-installed Python FastMCP server (zhongweili/nanobanana-mcp-server).
+# Installs the `nanobanana-mcp-server` console script. Reads FASTMCP_TRANSPORT=http
+# + FASTMCP_HOST + FASTMCP_PORT from supervisord env to serve over HTTP on :8126.
+# Auth: GEMINI_API_KEY (Google AI Studio), supplied via env_file: env/nanobanana.env. ---
+RUN python -m pip install --no-cache-dir "nanobanana-mcp-server>=0.4.4"
+
 # Copy installed Python packages from builder (arr-mcp + dispatcharr deps).
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
@@ -124,7 +131,7 @@ RUN chmod +x /usr/local/bin/healthcheck.sh
 # Expose the three internal ports. The Cloudflare Tunnel container reaches
 # these via Docker network DNS — no host port-mapping required at runtime,
 # but EXPOSE makes the contract explicit.
-EXPOSE 8120 8121 8122 8123 8124 8125
+EXPOSE 8120 8121 8122 8123 8124 8125 8126
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh

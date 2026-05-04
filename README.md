@@ -22,8 +22,9 @@ Claude.ai web / Claude Code / Codex
    - port 8123 → trakt          (supergateway → python /mcps/trakt/server.py stdio)
    - port 8124 → openfoodfacts  (off-mcp-server, npm @jagjeevan/openfoodfacts-mcp@1.1.0)
    - port 8125 → pbs            (node /mcps/pbs/dist/index.js, native HTTP)
-   ▼   Docker bridge networks (LAN backends) / Trakt + OpenFoodFacts + PBS APIs (external)
-[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv, api.openfoodfacts.org, services.health.gov.au/pbs
+   - port 8126 → nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
+   ▼   Docker bridge networks (LAN backends) / Trakt + OpenFoodFacts + PBS + Gemini APIs (external)
+[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv, api.openfoodfacts.org, services.health.gov.au/pbs, generativelanguage.googleapis.com
 ```
 
 ## MCP roster
@@ -36,6 +37,7 @@ Claude.ai web / Claude Code / Codex
 | **trakt** | Python | stdio + supergateway | `github.com/danauld/mcp-trakt` (clone) | 8123 | v2 (2026-04-25) |
 | **openfoodfacts** | Node TS | native HTTP | npm `@jagjeevan/openfoodfacts-mcp@1.1.0` (global install) | 8124 | v3 (2026-04-26) |
 | **pbs** | Node | native HTTP | `github.com/danauld/mcp-pbs` (clone, compiled JS) | 8125 | v3 (2026-04-26) |
+| **nanobanana** | Python | FastMCP HTTP | PyPI `nanobanana-mcp-server` (pip install) | 8126 | v4 (2026-05-04) |
 
 Trakt has its own per-user device-code OAuth (independent of the Worker's OAuth). Its token persists at `/state/trakt/auth_token.json` inside the container, which is bind-mounted from `/volume1/docker/synology-mcp-hub/state/trakt` on the Synology host so it survives restarts + image upgrades.
 
@@ -77,10 +79,11 @@ The Hub stack uses env files mounted from the Synology host. On the Synology:
 ```bash
 mkdir -p /volume1/docker/synology-mcp-hub/env
 # Copy the .env.example files from this repo into env/ and fill in values.
-# arr.env       — SONARR_API_KEY, RADARR_API_KEY, PROWLARR_API_KEY
+# arr.env         — SONARR_API_KEY, RADARR_API_KEY, PROWLARR_API_KEY
 # dispatcharr.env — DISPATCHARR_API_KEY
-# gramps.env    — GRAMPS_USERNAME, GRAMPS_PASSWORD
-# trakt.env     — TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET
+# gramps.env      — GRAMPS_USERNAME, GRAMPS_PASSWORD
+# trakt.env       — TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET
+# nanobanana.env  — GEMINI_API_KEY
 
 # Persistent state for Trakt's per-user OAuth token
 mkdir -p /volume1/docker/synology-mcp-hub/state/trakt
