@@ -16,6 +16,7 @@
 #   8124 — openfoodfacts  (off-mcp-server, npm-global @jagjeevan/openfoodfacts-mcp@1.1.0)
 #   8125 — pbs            (node /mcps/pbs/dist/index.js listens directly)
 #   8127 — nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
+#   8128 — gws            (Google Workspace CLI v0.7.0, supergateway-bridged)
 #
 # Cloudflare Tunnel routes <slug>-be.danielauld.com → mcp-hub:81NN.
 # Per-MCP CF Worker shim handles OAuth + proxies to the backend hostnames.
@@ -89,7 +90,7 @@ FROM python:3.12-slim
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     SUPERVISOR_LOGLEVEL=info \
-    HUB_VERSION=v4
+    HUB_VERSION=v5
 
 # Runtime deps only: Node (for gramps + supergateway), supervisor, tini for clean shutdown.
 RUN apt-get update \
@@ -99,6 +100,9 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends nodejs \
     && npm install -g supergateway@3.4.3 \
     && npm install -g @jagjeevan/openfoodfacts-mcp@1.1.0 \
+    # gws MCP (Google Workspace CLI). PIN to 0.7.0 — `gws mcp` subcommand was
+    # removed in 0.8.0 (upstream PR #275). Do NOT bump to @latest.
+    && npm install -g @googleworkspace/cli@0.7.0 \
     # Patch upstream v1.1.0 bug: dist/tools/index.js calls registerPriceTools(server)
     # twice in a row, which causes "Tool getProductPrices is already registered"
     # at startup. Remove the second call. Track upstream for a fix; once resolved,
@@ -123,6 +127,12 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy MCP sources.
 COPY --from=builder /mcps /mcps
 
+# gws MCP wrapper script (no build-time dependencies — just a shell script that
+# hydrates ~/.config/gws/ from the GWS_CREDENTIALS env var at supervisord
+# program start, then execs `gws mcp -s drive,tasks,gmail,people`).
+COPY mcps/gws /mcps/gws
+RUN chmod +x /mcps/gws/start.sh
+
 # Supervisor config + healthcheck script.
 COPY supervisord.conf /etc/supervisor/conf.d/mcp-hub.conf
 COPY scripts/healthcheck.sh /usr/local/bin/healthcheck.sh
@@ -131,7 +141,7 @@ RUN chmod +x /usr/local/bin/healthcheck.sh
 # Expose the three internal ports. The Cloudflare Tunnel container reaches
 # these via Docker network DNS — no host port-mapping required at runtime,
 # but EXPOSE makes the contract explicit.
-EXPOSE 8120 8121 8122 8123 8124 8125 8127
+EXPOSE 8120 8121 8122 8123 8124 8125 8127 8128
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh

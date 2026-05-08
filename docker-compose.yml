@@ -35,6 +35,7 @@ services:
       - /volume1/docker/synology-mcp-hub/env/gramps.env
       - /volume1/docker/synology-mcp-hub/env/trakt.env
       - /volume1/docker/synology-mcp-hub/env/nanobanana.env
+      - /volume1/docker/synology-mcp-hub/env/gws.env
 
     # Trakt's per-user OAuth token persists to disk inside the container.
     # Bind-mount a host directory so the device-code dance survives
@@ -61,6 +62,7 @@ services:
       - "8124:8124"  # openfoodfacts
       - "8125:8125"  # pbs
       - "8127:8127"  # nanobanana
+      - "8128:8128"  # gws
 
     networks:
       mcp-hub-net:
