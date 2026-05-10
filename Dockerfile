@@ -6,6 +6,7 @@
 #   /mcps/gramps/        — Node app (HTTP-native MCP, built dist/)
 #   /mcps/trakt/         — Python source (stdio, wrapped by supergateway)
 #   /mcps/pbs/           — Node app (HTTP-native MCP, recovered compiled JS in dist/)
+#   /mcps/whatsupp/      — Node app (HTTP-native MCP, built dist/, Supabase backend)
 #   (openfoodfacts + nanobanana are package installs, not under /mcps)
 #
 # Each MCP runs under supervisord on its own internal port:
@@ -16,6 +17,8 @@
 #   8124 — openfoodfacts  (off-mcp-server, npm-global @jagjeevan/openfoodfacts-mcp@1.1.0)
 #   8125 — pbs            (node /mcps/pbs/dist/index.js listens directly)
 #   8127 — nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
+#   8129 — whatsupp       (node /mcps/whatsupp/dist/index.js listens directly)
+#                         (8126 is taken by vault-mcp on the Synology host)
 #   8128 — gws            (Google Workspace CLI v0.7.0, supergateway-bridged)
 #
 # Cloudflare Tunnel routes <slug>-be.danielauld.com → mcp-hub:81NN.
@@ -84,13 +87,31 @@ RUN --mount=type=secret,id=gh_token \
     && npm ci --omit=dev \
     && rm -rf /mcps/pbs/.git
 
+# --- whatsupp MCP: PRIVATE repo (medication & supplement tracker, Supabase
+# backend). Node TS Express HTTP MCP using StreamableHTTPServerTransport.
+# The Git repo nests the server under "App • WhatSupp/whatsupp-mcp-server/"
+# (alongside the iOS app source), so we clone to a tmp dir, move the server
+# subfolder into /mcps/whatsupp, then build there. Migrated from Cloud Run
+# 2026-05-10 (v6). Auth: SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY via env_file. ---
+RUN --mount=type=secret,id=gh_token \
+    GH_TOKEN=$(cat /run/secrets/gh_token) \
+    && git clone --depth=1 \
+        "https://x-access-token:${GH_TOKEN}@github.com/danauld/WhatSupp.git" \
+        /tmp/whatsupp-src \
+    && mv "/tmp/whatsupp-src/App • WhatSupp/whatsupp-mcp-server" /mcps/whatsupp \
+    && rm -rf /tmp/whatsupp-src \
+    && cd /mcps/whatsupp \
+    && npm ci \
+    && npm run build \
+    && npm prune --omit=dev
+
 # --- final stage: runtime image (no build toolchain bloat) ---
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     SUPERVISOR_LOGLEVEL=info \
-    HUB_VERSION=v5
+    HUB_VERSION=v6
 
 # Runtime deps only: Node (for gramps + supergateway), supervisor, tini for clean shutdown.
 RUN apt-get update \
@@ -141,7 +162,7 @@ RUN chmod +x /usr/local/bin/healthcheck.sh
 # Expose the three internal ports. The Cloudflare Tunnel container reaches
 # these via Docker network DNS — no host port-mapping required at runtime,
 # but EXPOSE makes the contract explicit.
-EXPOSE 8120 8121 8122 8123 8124 8125 8127 8128
+EXPOSE 8120 8121 8122 8123 8124 8125 8127 8128 8129
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
     CMD /usr/local/bin/healthcheck.sh

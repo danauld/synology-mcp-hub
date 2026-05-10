@@ -23,8 +23,9 @@ Claude.ai web / Claude Code / Codex
    - port 8124 → openfoodfacts  (off-mcp-server, npm @jagjeevan/openfoodfacts-mcp@1.1.0)
    - port 8125 → pbs            (node /mcps/pbs/dist/index.js, native HTTP)
    - port 8127 → nanobanana     (nanobanana-mcp-server, pip-installed FastMCP HTTP)
-   ▼   Docker bridge networks (LAN backends) / Trakt + OpenFoodFacts + PBS + Gemini APIs (external)
-[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv, api.openfoodfacts.org, services.health.gov.au/pbs, generativelanguage.googleapis.com
+   - port 8129 → whatsupp       (node /mcps/whatsupp/dist/index.js, native HTTP, Supabase backend)
+   ▼   Docker bridge networks (LAN backends) / Trakt + OpenFoodFacts + PBS + Gemini + Supabase APIs (external)
+[backends] sonarr, radarr, prowlarr, dispatcharr, grampsweb, api.trakt.tv, api.openfoodfacts.org, services.health.gov.au/pbs, generativelanguage.googleapis.com, *.supabase.co
 ```
 
 ## MCP roster
@@ -37,6 +38,7 @@ Claude.ai web / Claude Code / Codex
 | **trakt** | Python | stdio + supergateway | `github.com/danauld/mcp-trakt` (clone) | 8123 | v2 (2026-04-25) |
 | **openfoodfacts** | Node TS | native HTTP | npm `@jagjeevan/openfoodfacts-mcp@1.1.0` (global install) | 8124 | v3 (2026-04-26) |
 | **pbs** | Node | native HTTP | `github.com/danauld/mcp-pbs` (clone, compiled JS) | 8125 | v3 (2026-04-26) |
+| **whatsupp** | Node TS | native HTTP | `github.com/danauld/WhatSupp` (clone subfolder + npm build) | 8129 | v6 (2026-05-10) |
 | **nanobanana** | Python | FastMCP HTTP | PyPI `nanobanana-mcp-server` (pip install) | 8127 | v4 (2026-05-04) |
 
 Trakt has its own per-user device-code OAuth (independent of the Worker's OAuth). Its token persists at `/state/trakt/auth_token.json` inside the container, which is bind-mounted from `/volume1/docker/synology-mcp-hub/state/trakt` on the Synology host so it survives restarts + image upgrades.

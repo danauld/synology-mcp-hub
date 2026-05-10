@@ -36,6 +36,7 @@ services:
       - /volume1/docker/synology-mcp-hub/env/trakt.env
       - /volume1/docker/synology-mcp-hub/env/nanobanana.env
       - /volume1/docker/synology-mcp-hub/env/gws.env
+      - /volume1/docker/synology-mcp-hub/env/whatsupp.env
 
     # Trakt's per-user OAuth token persists to disk inside the container.
     # Bind-mount a host directory so the device-code dance survives
@@ -63,6 +64,7 @@ services:
       - "8125:8125"  # pbs
       - "8127:8127"  # nanobanana
       - "8128:8128"  # gws
+      - "8129:8129"  # whatsupp  (8126 taken by vault-mcp host stack)
 
     networks:
       mcp-hub-net:

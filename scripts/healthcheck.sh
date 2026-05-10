@@ -36,6 +36,9 @@ curl -fsS --max-time 5 "http://127.0.0.1:8124/health" >/dev/null
 # pbs-mcp (recovered Express HTTP MCP) exposes /health.
 curl -fsS --max-time 5 "http://127.0.0.1:8125/health" >/dev/null
 
+# whatsupp-mcp (Node Express HTTP MCP) exposes /health (returns JSON).
+curl -fsS --max-time 5 "http://127.0.0.1:8129/health" >/dev/null
+
 # nanobanana-mcp (FastMCP HTTP) — POST a JSON-RPC initialize to /mcp.
 # FastMCP doesn't ship a separate /health route; an initialize that returns
 # 200 confirms the server is up and the Gemini client config loaded.
